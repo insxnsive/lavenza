@@ -1,45 +1,30 @@
 import { GoogleGenAI } from "@google/genai";
-import { createInterface } from 'node:readline/promises';
-import { stdin as input, stdout as output } from 'node:process';
 import * as fs from "node:fs";
 import 'dotenv/config'
 
-
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-async function main() {
-  const rl = createInterface({ input, output});
+export async function generateImage(prompt, userId) {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-image",
+      contents: prompt,
+    });
 
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        const imageData = part.inlineData.data;
+        const buffer = Buffer.from(imageData, "base64");
 
-  rl.on('SIGINT', () => {
-    console.log('\nBye!');
-    rl.close();
-    process.exit(0);
-  });
-  
-  while(true){
-    try{
-      const query = await rl.question('Descreva como quer a imagem que sera gerada: ');
+        const fileName = `image-${Date.now()}-${userId}.png`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-image",
-        contents: query,
-      });
+        fs.writeFileSync(fileName, buffer);
 
-      for (const part of response.candidates[0].content.parts) {
-        if (part.text) {
-          console.log(part.text);
-        } else if (part.inlineData) {
-          const imageData = part.inlineData.data;
-          const buffer = Buffer.from(imageData, "base64");
-          fs.writeFileSync("gemini-native-image.png", buffer);
-          console.log("Image saved as gemini-native-image.png");
-        }
+        return fileName;
       }
-    } catch (err) {
-      console.error("Error:", err.message);
     }
-    }
+  } catch (err) {
+    console.error("Erro ao gerar imagem:", err);
+    throw err;
   }
-
-main();
+}
